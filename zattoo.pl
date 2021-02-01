@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-#      Copyright (C) 2019-2020 Jan-Luca Neumann
+#      Copyright (C) 2019-2021 Jan-Luca Neumann
 #      https://github.com/sunsettrack4/telerising/
 #
 #      Collaborators:
@@ -32,7 +32,7 @@ my $tee = new IO::Tee(\*STDOUT, ">>log.txt");
 select $tee;
 
 print "\n =========================                     I             +        \n";
-print " TELERISING API v0.4.1                          I    I         +        \n";
+print " TELERISING API v0.4.5                          I    I         +        \n";
 print " =========================                       I  I       +      +    \n";
 print "                                                  II                    \n";
 print "ZZZZZZZZZ       AA     TTTTTTTTTT TTTTTTTTTT    888888        888888    \n";
@@ -231,7 +231,7 @@ sub login_process {
 				$zserver = "fr5-0";
 			} elsif( $zserver eq "" ) {
 				$zserver = "fr5-0";
-			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|1und1-stu1903-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]/ ) {
+			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|1und1-stu1903-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]|1und1-unn1101-[1-2]|1und1-mun1901-[1-2]|1und1-mun1902-[1-4]|1und1-dor1101-[1-2]|1und1-dor1901-[1-2]|1und1-wup1101-[1-2]/ ) {
 				INFO "Custom Zattoo server \"$zserver\" will be used.\n";
 			} else {
 				INFO "Custom Zattoo server \"$zserver\" is not supported, default server will be used instead.\n";
@@ -790,7 +790,7 @@ sub login_process {
 					}
 					
 					my $token_url = $js_response->content;
-					$token_url =~ s/(.*)(token-.*)(\.json"})(.*)/$2\.json/g;
+					$token_url =~ s/(.*)(token-+(.*?)\.json)(.*)/$2/g;
 					
 					if( not defined $2 ) {
 						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to parse token URL)\n\n";
@@ -801,7 +801,7 @@ sub login_process {
 					}
 
 					# GET APPTOKEN
-					my $apptoken_url = "https://$provider/$2.json";
+					my $apptoken_url = "https://$provider/$2";
 					
 					my $apptoken_agent    = LWP::UserAgent->new(
 						ssl_opts => {
@@ -1050,6 +1050,8 @@ sub login_process {
 				
 				if( $country eq "CH" ) {
 					INFO "COUNTRY: SWITZERLAND\n";
+				} elsif( $country eq "AT" ) {
+					INFO "COUNTRY: AUSTRIA\n";
 				} elsif( $country eq "DE" ) {
 					INFO "COUNTRY: GERMANY\n";
 				} elsif( $provider eq "zattoo.com" ) {
@@ -1104,6 +1106,35 @@ sub login_process {
 					} elsif( $alias ne "DE" and $product_code =~ /PREMIUM|ULTIMATE/ ) {
 						if( $alias =~ /BE|FR|IT|LU|NL|DK|IE|UK|GR|PT|ES|FI|AT|SE|EE|LT|LV|MT|PL|SK|SI|CZ|HU|CY|BG|RO|HR|GP|GY|MQ|RE|YT|AN/ ) {
 							INFO "No German IP address detected, Zattoo services can be used within the EU.\n";
+							$tv_mode = "live";
+						} else {
+							ERROR "No supported IP address (EU) detected, Zattoo services can't be used.\n\n";
+							open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+							print $error_file "ERROR: No supported IP address (EU) detected, Zattoo services can't be used.";
+							close $error_file;
+							exit;
+						}
+					} else {
+						$tv_mode = "live";
+					}
+				
+				} elsif( $country eq "AT" and $provider eq "zattoo.com" ) {
+					
+					if( $alias ne "AT" and $product_code eq "FREE" ) {
+						ERROR "No Austrian IP address detected, Zattoo services can't be used.\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "ERROR: No Austrian IP address detected, Zattoo services can't be used.";
+						close $error_file;
+						exit;
+					} elsif ( $alias eq "AT" and $product_code eq "FREE" ) {
+						ERROR "Invalid account type detected, Zattoo services can't be used.\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "ERROR: Invalid account type detected, Zattoo services can't be used.";
+						close $error_file;
+						exit;
+					} elsif( $alias ne "AT" and $product_code =~ /PREMIUM|ULTIMATE/ ) {
+						if( $alias =~ /BE|FR|IT|LU|NL|DK|IE|UK|GR|PT|ES|FI|DE|SE|EE|LT|LV|MT|PL|SK|SI|CZ|HU|CY|BG|RO|HR|GP|GY|MQ|RE|YT|AN/ ) {
+							INFO "No Austrian IP address detected, Zattoo services can be used within the EU.\n";
 							$tv_mode = "live";
 						} else {
 							ERROR "No supported IP address (EU) detected, Zattoo services can't be used.\n\n";
@@ -1259,11 +1290,18 @@ sub login_process {
 										$teaser_title =~ s/,/ /g;
 										$teaser_title =~ s/-/_/g;
 										
-										
-										if( defined $teaser_text ) {
-											$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . " (" . $teaser_text . ")\n";
+										if( defined $teaser_image ) {
+											if( defined $teaser_text ) {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . " (" . $teaser_text . ")\n";
+											} else {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . "\n";
+											}
 										} else {
-											$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . "\n";
+											if( defined $teaser_text ) {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\", " . $teaser_title . " (" . $teaser_text . ")\n";
+											} else {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\", " . $teaser_title . "\n";
+											}
 										}
 										
 										if( $teaser_type eq "Avod::Video" ) {
@@ -4594,7 +4632,7 @@ sub http_child {
 						# EDIT PLAYLIST
 						print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD $vod | $quality | $platform - Editing M3U8\n";
 						$link        =~ /(.*)(NAME=")(.*)(",DEFAULT=.*)($final_quality_audio.*?z32=)(.*)"/m;
-						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0.m3u8?z32=" . $6;
+						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0_tid_1_nd_4000_mbr_5000_vd_1000000.m3u8?z32=" . $6;
 						my $link_audio_url = $uri . "/" . $5 . $6;
 						my $language = $3;
 						
@@ -5049,7 +5087,7 @@ sub http_child {
 						# EDIT PLAYLIST
 						print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE $movie_vod | $quality | $platform - Editing M3U8\n";
 						$link        =~ /(.*)(NAME=")(.*)(",DEFAULT=.*)($final_quality_audio.*?z32=)(.*)"/m;
-						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0.m3u8?z32=" . $6;
+						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0_tid_1_nd_4000_mbr_5000_vd_1000000.m3u8.m3u8?z32=" . $6;
 						my $link_audio_url = $uri . "/" . $5 . $6;
 						my $language = $3;
 						
